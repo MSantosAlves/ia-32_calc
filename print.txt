@@ -1,5 +1,0 @@
-mov eax, 4      ; syscall ID (sys_write)
-  mov ebx, 1      ; file handler (stdout)
-  mov ecx, msg    ; move ptr string msg
-  mov edx, msgLen ; move string syze 
-  int 80h         ; syscall (eax->edx: arguments)
