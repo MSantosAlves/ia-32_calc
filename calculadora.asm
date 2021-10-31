@@ -19,27 +19,30 @@ section .data
   negativeSignal db '-'
 
 section .bss 
-  integer_value resw 2
-  integer_string resb 16
-  integer_string_pos resb 2
+  string_to_int_buffer resb 6 ; buffer to save input as string
+  string_to_int_buffer_size EQU $-string_to_int_buffer
 
-  int_string_buffer resb 6 ; handle 16 bits integer
-  
-  int_string_buffer_size resb 6
+  integer_value resw 1
+  integer_value2 resw 1
 
-  operation resb 1
-  first_operand resw 1
-  second_operand resw 1
+  int_to_string_buffer resb 16    ; buffer to save integer as string
+  int_to_string_buffer_pos resb 2 
+
 global _start
 section .text 
 _start:
-  ; call PrintMenu
+  call PrintMenu
 
-  call Read16Int
+  push integer_value
+  push string_to_int_buffer_size
+  push string_to_int_buffer
+  
+  call Read16Int ; return an integer as last param in stack
 
-  ; push word 10
-  ; push word -25
-  ; call Sum
+  pop ax ; get integer
+  mov [integer_value], ax ; move integer to integer_value label
+
+
   call Print16Int
   call Print16IntLoop2
 
@@ -68,53 +71,33 @@ Sum:
 ; |  Functions to read 16 bits input  | 
 ; *-----------------------------------*
 Read16Int:
+  push ebp
+  mov ebp, esp
+
+  push eax
+  push ebx
+  push ecx
+  push edx
+  push esi
+
   mov eax, 3
   mov ebx, 0    
-  mov ecx, int_string_buffer   
-  mov edx, int_string_buffer_size
+  mov ecx, [ebp+8]   
+  mov edx, [ebp+12]
   int 80h 
-
-  call ParseStrTo16Int
-
-  ret
-
-HandleReadNegativeInt:
-  sub ecx, ecx
-  add ecx, 1 ; Set flag NEGATIVE = true
-
-  inc esi ; Increment loop string counter
-  jmp ParseStrTo16IntLoop
-
-  ret
-NegativeInt:
-  mov ebx, -1
-  movzx eax, ax
-  mul ebx
-  
-  mov word [integer_value], ax
-
-  ret
 ParseStrTo16Int:
-  mov [integer_value], word 0 ; set acc = 0
+  mov [ebp+16], word 0 ; set integer_value = 0
   sub ecx, ecx ; ecx = 0 -> NEGATIVE = false / ecx = 1 -> NEGATIVE = true
-  sub esi, esi ; string counter = 0
+  sub esi, esi ; char counter = 0
   sub eax, eax
-  call ParseStrTo16IntLoop
-
-  cmp ecx, 1 ; negative number
-  je NegativeInt
-
-  ret
-StrToIntEndLoop:
-  ret
-  
 ParseStrTo16IntLoop:
-  mov bl, [int_string_buffer+esi]
+  mov edx, [ebp+8]  ; string_to_int_buffer address on stack
+  mov bl, [edx+esi] ; string_to_int_buffer address + char counter
 
-  cmp bl, 0ah
+  cmp bl, 0ah ; if char == line breaker
   je StrToIntEndLoop
 
-  cmp bl, '-' ; ASCII decimal equivalent to (-) signal
+  cmp bl, '-' ; if char == '-'
   je HandleReadNegativeInt
 
   sub bl, 48  ; ASCII to digit value
@@ -125,15 +108,44 @@ ParseStrTo16IntLoop:
   mul dx
   add ax, word bx
 
-  mov word [integer_value], ax
+  mov word [ebp+16], ax
   
   inc esi
 
   cmp esi, 6 ; compare with string size
   jne ParseStrTo16IntLoop 
+
+StrToIntEndLoop:
+  cmp ecx, 1 ; negative number
+  je NegativeInt
+
+StrToIntExit:
+  pop esi
+  pop edx
+  pop ecx
+  pop ebx
+  pop eax
+  pop ebp
+
+  ret 8
+ 
+HandleReadNegativeInt:
+  sub ecx, ecx
+  add ecx, 1 ; Set flag NEGATIVE = true
+
+  inc esi ; Increment loop string counter
+  jmp ParseStrTo16IntLoop
+
+NegativeInt:
+  mov ebx, -1
+  movzx eax, ax
+  mul ebx
   
-  ret
-  
+  mov word [ebp+16], ax
+
+  jmp StrToIntExit
+
+
 ; *---------------------------------------*
 ; |  Functions to print 16 bits integers  |
 ; *---------------------------------------*
@@ -158,11 +170,11 @@ Print16Int:
 
   jmp Print16IntNL
 Print16IntNL:
-  mov ecx, integer_string 
+  mov ecx, int_to_string_buffer 
   mov ebx, 10 ; new line character in ASCII
   mov [ecx], ebx
   inc ecx
-  mov [integer_string_pos], ecx
+  mov [int_to_string_buffer_pos], ecx
 
 Print16IntLoop:
   mov edx, 0
@@ -171,17 +183,17 @@ Print16IntLoop:
   push eax    ; division quocient
   add edx, 48 ; add division remainder + 48 = transform digit into respective ASCII characther
 
-  mov ecx, [integer_string_pos]
+  mov ecx, [int_to_string_buffer_pos]
   mov [ecx], dl ; less significative byte of edx (digit ASCII representaion in binary
   inc ecx
-  mov [integer_string_pos], ecx
+  mov [int_to_string_buffer_pos], ecx
 
   pop eax
   cmp eax, 0
   jne Print16IntLoop
 
 Print16IntLoop2:  
-  mov ecx, [integer_string_pos]
+  mov ecx, [int_to_string_buffer_pos]
 
   mov eax, 4      ; syscall ID (sys_write)
   mov ebx, 1      ; file handler (stdout)
@@ -189,11 +201,11 @@ Print16IntLoop2:
   mov edx, 1      ; move string syze 
   int 80h   
 
-  mov ecx, [integer_string_pos] 
+  mov ecx, [int_to_string_buffer_pos] 
   dec ecx
-  mov [integer_string_pos], ecx
+  mov [int_to_string_buffer_pos], ecx
 
-  cmp ecx, integer_string
+  cmp ecx, int_to_string_buffer
   jge Print16IntLoop2
 
   ret
