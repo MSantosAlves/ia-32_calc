@@ -23,6 +23,9 @@ section .data
   resultado_msg db "Resultado: "
   resultado_msg_len EQU $-resultado_msg
 
+  nl_msg db 0ah, 0dh
+  nl_msg_len EQU $-nl_msg
+
   parte_inteira_msg db "Parte inteira: ", 0ah, 0dh
   parte_inteira_msg_len EQU $-parte_inteira_msg
 
@@ -40,6 +43,10 @@ section .bss
 
   int_to_string_buffer resb 16    ; buffer to save integer as string
   int_to_string_buffer_pos resb 2 
+
+  string1_buffer resb 20
+  string2_buffer resb 20
+  concat_string_buffer resb 40
 
 global _start
 section .text 
@@ -394,9 +401,171 @@ OpPotEnd:
 
   jmp PrintMenu
 
+FatZeroOrOne:
+  mov eax, 1
+  jmp EndOptFat
 OpFat:
+  sub ecx, ecx
+  push integer_value
+  push string_to_int_buffer_size
+  push string_to_int_buffer
+  
+  call Read16Int ; return an integer as last param in stack
+
+  pop eax
+  pop ebx
+  pop cx ; integer_value returned from read function
+
+  mov bx, cx ; future overflow comparison
+
+  cmp cx, 0
+  je FatZeroOrOne
+
+  cmp cx, 1
+  je FatZeroOrOne
+  
+  sub eax, eax
+  mov ax, cx
+
+  sub cx, 1
+OpFatLoop:
+  mul cx
+  sub cx, 1
+  cmp cx, 1
+  jg OpFatLoop
+EndOptFat:
+  push eax
+  push ebx
+  push ecx
+  push edx
+
+  mov eax, 4
+  mov ebx, 1
+  mov ecx, resultado_msg
+  mov edx, resultado_msg_len
+  int 80h
+  
+  pop edx
+  pop ecx
+  pop ebx
+  pop eax
+
+  push int_to_string_buffer
+  push word ax
+  
+  call Print16Int
+
+  cmp bx, 7
+  jg HandleOverflow
+
   jmp PrintMenu
+ClearString:
+  push ebp
+  mov ebp, esp
+
+  push eax
+  push ebx
+  push esi
+
+  sub eax, eax
+  sub esi, esi
+
+  mov eax, [ebp+12] ; string size
+  mov ebx, ebp 
+  add ebx, 8 ;string address
+LoopClearString:
+  mov byte [ebx+esi], 55
+
+  add esi, 1
+
+  cmp esi, eax
+  jb LoopClearString
+EndClearString:
+  pop esi
+  pop ebx
+  pop eax
+  pop ebp
+
+  ret 8
 OpConcat:
+  push 20
+  push string1_buffer
+  call ClearString
+
+  push 20
+  push string2_buffer
+  call ClearString
+
+  push 40
+  push concat_string_buffer
+  call ClearString
+
+  mov eax, 3
+  mov ebx, 0    
+  mov ecx, string1_buffer
+  mov edx, 20
+  int 80h
+
+  mov eax, 3
+  mov ebx, 0    
+  mov ecx, string2_buffer
+  mov edx, 20
+  int 80h
+
+  sub ecx, ecx
+  sub esi, esi
+  sub eax, eax
+
+OpConcatLoop:
+  mov al, byte [string1_buffer+esi]
+
+  cmp al, 0ah
+  je SecondStringIndex
+
+  mov byte [concat_string_buffer+ecx], al
+
+  inc esi
+  inc ecx
+
+  cmp esi, 20
+  jb OpConcatLoop
+
+  jmp OpConcatLoop2
+
+SecondStringIndex:
+  sub esi, esi
+OpConcatLoop2:
+  mov al, byte [string2_buffer+esi]
+
+  cmp al, 0ah
+  je OpConcatEnd
+
+  mov byte [concat_string_buffer+ecx], al
+
+  inc esi
+  inc ecx
+
+  cmp esi, 20
+  jb OpConcatLoop2
+OpConcatEnd:
+  mov eax, 4
+  mov ebx, 1
+  mov ecx, resultado_msg
+  mov edx, resultado_msg_len
+  int 80h
+
+  mov eax, 4
+  mov ebx, 1
+  mov ecx, concat_string_buffer
+  mov edx, 40
+  int 80h
+
+  mov eax, 4
+  mov ebx, 1
+  mov ecx, nl_msg
+  mov edx, nl_msg_len
+  int 80h
+
   jmp PrintMenu
 
 OpRepeat:
@@ -411,6 +580,33 @@ HandleOverflow:
 
   jmp PrintMenu
 
+ReadString:
+  push ebp
+  mov ebp, esp
+
+  push eax
+  push ebx
+  push ecx
+  push edx
+
+  mov ecx, ebp
+  add ecx, 12
+
+  mov edx, ebp
+  add edx, 8
+
+  mov eax, 3
+  mov ebx, 0    
+  int 80h
+
+  pop edx
+  pop ecx
+  pop ebx
+  pop eax
+
+  ret 4
+
+  
 ; *-----------------------------------*
 ; |  Functions to read 16 bits input  | 
 ; *-----------------------------------*
