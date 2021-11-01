@@ -16,10 +16,10 @@ section .data
           db "9 - Sair", 0dh, 0ah
 
   menuMsgLen EQU $-menuMsg 
-  negativeSignal db '-'
+  negative_signal db '-'
 
 section .bss 
-  string_to_int_buffer resb 6 ; buffer to save input as string
+  string_to_int_buffer resb 7 ; buffer to save input as string
   string_to_int_buffer_size EQU $-string_to_int_buffer
 
   integer_value resw 1
@@ -41,7 +41,11 @@ _start:
 
   pop ax ; get integer
   mov [integer_value], ax ; move integer to integer_value label
-
+  
+  push int_to_string_buffer_pos
+  push int_to_string_buffer
+  push negative_signal
+  push word [integer_value]
 
   call Print16Int
   call Print16IntLoop2
@@ -150,65 +154,89 @@ NegativeInt:
 ; |  Functions to print 16 bits integers  |
 ; *---------------------------------------*
 HandlePrintNegativeInt:
-  mov eax, 4      
+  push eax
+  push ebx
+  push ecx
+  push edx
+
+  mov eax, 4  ; print negative signal
   mov ebx, 1      
-  mov ecx, negativeSignal   
+  mov ecx, negative_signal   ; ecx = address of negative_signal
   mov edx, 1
-  int 80h ; print negative signal
+  int 80h     
   
-  mov ax, [integer_value]
+  pop edx
+  pop ecx
+  pop ebx
+  pop eax
+  
   neg ax
 
   jmp Print16IntNL
-  ret
 
 Print16Int:
-  mov ax, [integer_value]
+  push ebp
+  mov ebp, esp
 
-  cmp word [integer_value], 0
+  push eax
+  push ebx
+  push ecx
+  
+  mov ax, word [ebp+8]
+
+  cmp word [ebp+8], 0
   jl HandlePrintNegativeInt
 
-  jmp Print16IntNL
 Print16IntNL:
-  mov ecx, int_to_string_buffer 
+  mov ecx, ebp
+  add ecx, 16 ; ecx = address of int_to_string_buffer
   mov ebx, 10 ; new line character in ASCII
   mov [ecx], ebx
+
   inc ecx
-  mov [int_to_string_buffer_pos], ecx
 
 Print16IntLoop:
   mov edx, 0
   mov ebx, 10
   div ebx     ; integer division eax/10
-  push eax    ; division quocient
+  ; push eax    ; division quocient
   add edx, 48 ; add division remainder + 48 = transform digit into respective ASCII characther
 
-  mov ecx, [int_to_string_buffer_pos]
-  mov [ecx], dl ; less significative byte of edx (digit ASCII representaion in binary
-  inc ecx
-  mov [int_to_string_buffer_pos], ecx
+  mov [ecx], dl ; less significative byte of edx (digit ASCII representaion in binary)
 
-  pop eax
+  inc ecx
+  ; pop eax
   cmp eax, 0
   jne Print16IntLoop
 
-Print16IntLoop2:  
-  mov ecx, [int_to_string_buffer_pos]
-
-  mov eax, 4      ; syscall ID (sys_write)
-  mov ebx, 1      ; file handler (stdout)
-  mov ecx, ecx    ; move ptr string msg
-  mov edx, 1      ; move string syze 
-  int 80h   
-
-  mov ecx, [int_to_string_buffer_pos] 
   dec ecx
-  mov [int_to_string_buffer_pos], ecx
 
-  cmp ecx, int_to_string_buffer
+
+Print16IntLoop2:  
+
+  push eax
+  mov al, [ecx]
+  pop eax
+
+  mov eax, 4
+  mov ebx, 1  
+  mov ecx, ecx
+  mov edx, 1
+  int 80h
+
+  dec ecx
+  
+  mov ebx, ebp
+  add ebx, 16
+  cmp ecx, ebx
   jge Print16IntLoop2
 
-  ret
+Print16IntEnd:
+  pop ecx
+  pop ebx
+  pop eax
+  pop ebp
+
 ExitProgram:
   mov eax, 1 
   mov ebx, 0      
