@@ -1,3 +1,7 @@
+; *------------------------------------------------*
+; |  Data secion with pre-placed string messages   | 
+; *------------------------------------------------*
+
 section .data 
   menu_msg db "*-------------------*", 0dh, 0ah,
           db "| Calculadora IA-32 |", 0dh, 0ah,
@@ -26,14 +30,18 @@ section .data
   nl_msg db 0ah, 0dh
   nl_msg_len EQU $-nl_msg
 
-  parte_inteira_msg db "Parte inteira: ", 0ah, 0dh
+  parte_inteira_msg db "Parte inteira: "
   parte_inteira_msg_len EQU $-parte_inteira_msg
 
-  resto_msg db "Resto da divisão: ", 0ah, 0dh
+  resto_msg db "Resto da divisão: "
   resto_msg_len EQU $-resto_msg
 
   overflow_msg db "DEU OVERFLOW.", 0ah, 0dh
   overflow_msg_size EQU $-overflow_msg
+
+; *--------------------------------------------*
+; |  Buffers to start strings, integers, etc   | 
+; *--------------------------------------------*
 section .bss 
   string_to_int_buffer resb 7 ; buffer to save input as string
   string_to_int_buffer_size EQU $-string_to_int_buffer
@@ -56,6 +64,9 @@ _start:
 
   call ExitProgram
 
+; *------------------------------------------*
+; |  Functions to show/handle menu options   | 
+; *------------------------------------------*
 PrintMenu:
   mov eax, 4      
   mov ebx, 1      
@@ -131,7 +142,9 @@ InvalidOperation:
 
   jmp PrintMenu
         
-
+; *-----------------------------------*
+; |  Functions to calculate results   | 
+; *-----------------------------------*
 OpSum:
   sub edx, edx
   push integer_value
@@ -241,7 +254,7 @@ OpMult:
   pop cx ; integer_value returned from read function
   
   sub eax, eax
-  mov ax, cx
+  movsx eax, word cx
 
   push integer_value
   push string_to_int_buffer_size
@@ -251,12 +264,10 @@ OpMult:
 
   pop ebx
   pop ebx
-  pop dx ; integer_value returned from read function
+  pop bx ; integer_value returned from read function
   
-  imul dx ; A = B * C 
-
-  mov ebx, eax
-  mov bx, 0   ; save overflow info (has overflow if first 16 digits binary > 0)
+  movsx ebx, word bx 
+  imul ebx ; A = B * C 
 
   push eax
   push ebx
@@ -279,39 +290,39 @@ OpMult:
   
   call Print16Int
 
-  cmp ebx, 0
-  ja HandleOverflow
+  movsx ecx, word ax
+  cmp ecx, eax
+  jne HandleOverflow 
   
   jmp PrintMenu
 OpDiv:
-  sub ecx, ecx
+  push integer_value
+  push string_to_int_buffer_size
+  push string_to_int_buffer
+  
+  call Read16Int ; return an integer as last param in stack
+
+  pop eax
+  pop eax
+
   sub eax, eax
-
+  pop ax ; integer_value returned from read function
+  
   push integer_value
   push string_to_int_buffer_size
   push string_to_int_buffer
   
   call Read16Int ; return an integer as last param in stack
 
-  pop edx
   pop ebx
-  pop cx ; integer_value returned from read function
-  
-  mov ax, cx
-
-  sub ecx, ecx
-  push integer_value
-  push string_to_int_buffer_size
-  push string_to_int_buffer
-  
-  call Read16Int ; return an integer as last param in stack
-
-  pop edx
   pop ebx
-  pop cx ; integer_value returned from read function
+  sub ebx, ebx
+  pop bx ; integer_value returned from read function
+  
+  mov edx, 0
+  idiv ebx
 
-  ;Debug:
-  idiv cx ; TODO : FIX SEGMENTATION FAULT
+  movsx ebx, dx
 
   push eax
   push ebx
@@ -333,8 +344,29 @@ OpDiv:
   push word ax
   
   call Print16Int
+
+  push eax
+  push ebx
+  push ecx
+  push edx
+
+  mov eax, 4
+  mov ebx, 1
+  mov ecx, resto_msg
+  mov edx, resto_msg_len
+  int 80h
   
-  jmp PrintMenu 
+  pop edx
+  pop ecx
+  pop ebx
+  pop eax
+
+  push int_to_string_buffer
+  push word bx
+  
+  call Print16Int
+ 
+  jmp PrintMenu
 
 ExpZero:
   sub eax, eax
@@ -374,6 +406,9 @@ OpPot:
 OpPotLoop:
   imul cx 
 
+  sub ebx, ebx
+  mov bx, dx
+
   sub esi, 1
   cmp esi, 1
   jg OpPotLoop
@@ -399,6 +434,9 @@ OpPotEnd:
   push word ax
   
   call Print16Int
+
+  cmp bx, 0
+  jne HandleOverflow
 
   jmp PrintMenu
 
@@ -460,58 +498,27 @@ EndOptFat:
   jg HandleOverflow
 
   jmp PrintMenu
-ClearString:
-  push ebp
-  mov ebp, esp
 
-  push eax
-  push ebx
-  push esi
-
-  sub eax, eax
-  sub esi, esi
-
-  mov eax, [ebp+12] ; string size
-  mov ebx, ebp 
-  add ebx, 8 ;string address
-LoopClearString:
-  mov byte [ebx+esi], 55
-
-  add esi, 1
-
-  cmp esi, eax
-  jb LoopClearString
-EndClearString:
-  pop esi
-  pop ebx
-  pop eax
-  pop ebp
-
-  ret 8
 OpConcat:
-  push 20
-  push string1_buffer
-  call ClearString
-
-  push 20
-  push string2_buffer
-  call ClearString
-
-  push 40
-  push concat_string_buffer
-  call ClearString
-
   mov eax, 3
   mov ebx, 0    
   mov ecx, string1_buffer
   mov edx, 20
   int 80h
 
+  mov esi, eax
+  sub esi, 1
+
   mov eax, 3
   mov ebx, 0    
   mov ecx, string2_buffer
   mov edx, 20
   int 80h
+
+  add esi, eax
+  sub esi, 1
+
+  mov ebx, esi ; count read characters
 
   sub ecx, ecx
   sub esi, esi
@@ -549,16 +556,18 @@ OpConcatLoop2:
   cmp esi, 20
   jb OpConcatLoop2
 OpConcatEnd:
+  push ebx
   mov eax, 4
   mov ebx, 1
   mov ecx, resultado_msg
   mov edx, resultado_msg_len
   int 80h
+  pop ebx
 
+  mov edx, ebx
   mov eax, 4
   mov ebx, 1
   mov ecx, concat_string_buffer
-  mov edx, 40
   int 80h
 
   mov eax, 4
@@ -576,6 +585,9 @@ OpRepeat:
   mov edx, 20
   int 80h
 
+  mov edx, eax
+  sub edx, 1
+
   push integer_value
   push string_to_int_buffer_size
   push string_to_int_buffer
@@ -588,6 +600,12 @@ OpRepeat:
 
   cmp cx, 0
   je OpRepreatEnd
+
+
+  mov eax, edx
+  sub edx, edx
+  mul cx
+  mov edx, eax
 
   sub eax, eax
   sub ebx, ebx
@@ -617,16 +635,18 @@ CopyString:
   jmp CopyString
  
 OpRepreatEnd:
+  push edx
   mov eax, 4
   mov ebx, 1
   mov ecx, resultado_msg
   mov edx, resultado_msg_len
   int 80h
+  pop edx
 
   mov eax, 4
   mov ebx, 1
   mov ecx, repeat_string_max_buffer
-  mov edx, 180
+  ; mov edx, 180
   int 80h
 
   mov eax, 4
@@ -778,13 +798,11 @@ Print16IntLoop:
   mov edx, 0
   mov ebx, 10
   div ebx     ; integer division eax/10
-  ; push eax    ; division quocient
   add edx, 48 ; add division remainder + 48 = transform digit into respective ASCII characther
 
   mov [ecx], dl ; less significative byte of edx (digit ASCII representaion in binary)
 
   inc ecx
-  ; pop eax
   cmp eax, 0
   jne Print16IntLoop
 
