@@ -44,10 +44,9 @@ _start:
   pop eax
   pop ebx
   pop cx ; integer_value
+  mov word [integer_value], cx
 
-  push word cx
   call ChooseOperation
-  pop ecx
 
   call ExitProgram
 
@@ -61,39 +60,38 @@ PrintMenu:
   ret
 
 ChooseOperation:
-  push ebp
-  mov ebp, esp
-
-  push eax
-  push ebx
-  push ecx
-  push edx
-
-  mov ax, [ebp+8]
-
-  cmp ax, 1
+  cmp [integer_value], word 1
   jb InvalidOperation
-  cmp ax, 9
+
+  cmp [integer_value], word 9
   ja InvalidOperation
 
-  ; cmp ax, 1
-  ; cmp ax, 2
-  ; cmp ax, 3
-  ; cmp ax, 4
-  ; cmp ax, 5
-  ; cmp ax, 6
-  ; cmp ax, 7
-  ; cmp ax, 8
-  cmp ax, 9
+  cmp [integer_value], word 1
+  je OpSum
+  
+  cmp [integer_value], word 2
+  je OpSub
+  
+  cmp [integer_value], word 3
+  je OpMult
+  
+  cmp [integer_value], word 4
+  je OpDiv
+  
+  cmp [integer_value], word 5
+  je OpPot
+  
+  cmp [integer_value], word 6
+  je OpFat
+  
+  cmp [integer_value], word 7
+  je OpConcat
+
+  cmp [integer_value], word 8
+  je OpRepeat
+
+  cmp [integer_value], word 9
   je ExitProgram
-
-  pop edx
-  pop ecx
-  pop ebx
-  pop eax
-  pop ebp
-
-  ret
 InvalidOperation:
   push eax
   push ebx
@@ -111,28 +109,28 @@ InvalidOperation:
   push ebx
   push eax
 
-  call ExitProgram
+  jmp _start
   
 OpSum:
-  ret
+  jmp _start
 OpSub:
-  ret
+  jmp _start
 OpMult:
-  ret
+  jmp _start
 OpDiv:
-  ret
+  jmp _start
 
 OpPot:
-  ret
+  jmp _start
 
 OpFat:
-  ret
+  jmp _start
 
 OpConcat:
-  ret
+  jmp _start
 
 OpRepeat:
-  ret
+  jmp _start
 
 ; *-----------------------------------*
 ; |  Functions to read 16 bits input  | 
