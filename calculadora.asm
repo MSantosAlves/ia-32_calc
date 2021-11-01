@@ -84,7 +84,8 @@ ChooseOperation:
   ; cmp ax, 6
   ; cmp ax, 7
   ; cmp ax, 8
-  ; cmp ax, 9
+  cmp ax, 9
+  je ExitProgram
 
   pop edx
   pop ecx
@@ -112,16 +113,26 @@ InvalidOperation:
 
   call ExitProgram
   
-Sum:
-  push ebp          ; save ebp value
-  mov ebp, esp      ; create frame stack
+OpSum:
+  ret
+OpSub:
+  ret
+OpMult:
+  ret
+OpDiv:
+  ret
 
-  mov ax, [ebp+10]  ; 1st operand in stack
-  add ax, [ebp+8]   ; 2nd operand in stack
-  mov [integer_value], ax
+OpPot:
+  ret
 
-  pop ebp
-  ret 4             ; pop operands from stack
+OpFat:
+  ret
+
+OpConcat:
+  ret
+
+OpRepeat:
+  ret
 
 ; *-----------------------------------*
 ; |  Functions to read 16 bits input  | 
