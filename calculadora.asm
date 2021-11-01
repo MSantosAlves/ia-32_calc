@@ -18,6 +18,8 @@ section .data
   menuMsgLen EQU $-menuMsg 
   negative_signal db '-'
 
+  invalid_op_msg db "Operação inválida.", 0ah, 0dh
+  invalid_op_msg_len EQU $-invalid_op_msg
 section .bss 
   string_to_int_buffer resb 7 ; buffer to save input as string
   string_to_int_buffer_size EQU $-string_to_int_buffer
@@ -39,16 +41,13 @@ _start:
   
   call Read16Int ; return an integer as last param in stack
 
-  pop ax ; get integer
-  mov [integer_value], ax ; move integer to integer_value label
-  
-  push int_to_string_buffer_pos
-  push int_to_string_buffer
-  push negative_signal
-  push word [integer_value]
+  pop eax
+  pop ebx
+  pop cx ; integer_value
 
-  call Print16Int
-  call Print16IntLoop2
+  push word cx
+  call ChooseOperation
+  pop ecx
 
   call ExitProgram
 
@@ -60,6 +59,59 @@ PrintMenu:
   int 80h
 
   ret
+
+ChooseOperation:
+  push ebp
+  mov ebp, esp
+
+  push eax
+  push ebx
+  push ecx
+  push edx
+
+  mov ax, [ebp+8]
+
+  cmp ax, 1
+  jb InvalidOperation
+  cmp ax, 9
+  ja InvalidOperation
+
+  ; cmp ax, 1
+  ; cmp ax, 2
+  ; cmp ax, 3
+  ; cmp ax, 4
+  ; cmp ax, 5
+  ; cmp ax, 6
+  ; cmp ax, 7
+  ; cmp ax, 8
+  ; cmp ax, 9
+
+  pop edx
+  pop ecx
+  pop ebx
+  pop eax
+  pop ebp
+
+  ret
+InvalidOperation:
+  push eax
+  push ebx
+  push ecx
+  push edx
+
+  mov eax, 4
+  mov ebx, 1
+  mov ecx, invalid_op_msg
+  mov edx, invalid_op_msg_len
+  int 80h
+
+  push edx
+  push ecx
+  push ebx
+  push eax
+
+  call ExitProgram
+  
 Sum:
   push ebp          ; save ebp value
   mov ebp, esp      ; create frame stack
@@ -131,7 +183,7 @@ StrToIntExit:
   pop eax
   pop ebp
 
-  ret 8
+  ret
  
 HandleReadNegativeInt:
   sub ecx, ecx
