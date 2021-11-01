@@ -47,6 +47,7 @@ section .bss
   string1_buffer resb 20
   string2_buffer resb 20
   concat_string_buffer resb 40
+  repeat_string_max_buffer resb 180
 
 global _start
 section .text 
@@ -520,7 +521,7 @@ OpConcatLoop:
   mov al, byte [string1_buffer+esi]
 
   cmp al, 0ah
-  je SecondStringIndex
+  je RestartCounter
 
   mov byte [concat_string_buffer+ecx], al
 
@@ -532,7 +533,7 @@ OpConcatLoop:
 
   jmp OpConcatLoop2
 
-SecondStringIndex:
+RestartCounter:
   sub esi, esi
 OpConcatLoop2:
   mov al, byte [string2_buffer+esi]
@@ -569,6 +570,71 @@ OpConcatEnd:
   jmp PrintMenu
 
 OpRepeat:
+  mov eax, 3
+  mov ebx, 0    
+  mov ecx, string1_buffer
+  mov edx, 20
+  int 80h
+
+  push integer_value
+  push string_to_int_buffer_size
+  push string_to_int_buffer
+  
+  call Read16Int ; return an integer as last param in stack
+
+  pop eax
+  pop ebx
+  pop cx ; integer_value returned from read function
+
+  cmp cx, 0
+  je OpRepreatEnd
+
+  sub eax, eax
+  sub ebx, ebx
+  mov bx, cx  ; ax := number of repetitions 
+  sub ecx, ecx
+
+OpRepeatLoop:
+  sub esi, esi
+
+  sub bx, 1
+  cmp bx, 0 
+  jge CopyString
+
+  jmp OpRepreatEnd
+
+CopyString:
+  mov al, byte [string1_buffer+esi]
+
+  cmp al, 0ah
+  je OpRepeatLoop
+
+  mov byte [repeat_string_max_buffer+ecx], al
+
+  inc esi
+  inc ecx
+
+  jmp CopyString
+ 
+OpRepreatEnd:
+  mov eax, 4
+  mov ebx, 1
+  mov ecx, resultado_msg
+  mov edx, resultado_msg_len
+  int 80h
+
+  mov eax, 4
+  mov ebx, 1
+  mov ecx, repeat_string_max_buffer
+  mov edx, 180
+  int 80h
+
+  mov eax, 4
+  mov ebx, 1
+  mov ecx, nl_msg
+  mov edx, nl_msg_len
+  int 80h
+
   jmp PrintMenu
 
 HandleOverflow:
@@ -579,33 +645,6 @@ HandleOverflow:
   int 80h
 
   jmp PrintMenu
-
-ReadString:
-  push ebp
-  mov ebp, esp
-
-  push eax
-  push ebx
-  push ecx
-  push edx
-
-  mov ecx, ebp
-  add ecx, 12
-
-  mov edx, ebp
-  add edx, 8
-
-  mov eax, 3
-  mov ebx, 0    
-  int 80h
-
-  pop edx
-  pop ecx
-  pop ebx
-  pop eax
-
-  ret 4
-
   
 ; *-----------------------------------*
 ; |  Functions to read 16 bits input  | 
