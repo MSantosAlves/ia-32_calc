@@ -1,3 +1,5 @@
+; Matheus Santos Alves - 180025163
+
 ; *------------------------------------------------*
 ; |  Data secion with pre-placed string messages   | 
 ; *------------------------------------------------*
@@ -295,6 +297,15 @@ OpMult:
   jne HandleOverflow 
   
   jmp PrintMenu
+
+NegativeNum:
+  neg ax
+  mov ecx, 1  ; set first operand as negative
+  jmp DivDenom
+
+NegResult:
+  neg ax
+  jmp EndDiv
 OpDiv:
   push integer_value
   push string_to_int_buffer_size
@@ -307,7 +318,9 @@ OpDiv:
 
   sub eax, eax
   pop ax ; integer_value returned from read function
-  
+  mov edx, 0
+  movsx eax, word ax
+
   push integer_value
   push string_to_int_buffer_size
   push string_to_int_buffer
@@ -319,10 +332,22 @@ OpDiv:
   sub ebx, ebx
   pop bx ; integer_value returned from read function
   
-  mov edx, 0
-  idiv ebx
+  movsx ebx, word bx  
+  mov ecx, 0 ; set first operand as positive
+  mov edx, 0 ; set second operand as positive
 
-  movsx ebx, dx
+  cmp ax, word 0
+  jl NegativeNum
+  
+DivDenom:
+  idiv bx
+
+  cmp ecx, 1
+  je NegResult
+
+EndDiv:
+  sub ebx, ebx
+  movsx ebx, dx ; diivision rest
 
   push eax
   push ebx
@@ -372,13 +397,16 @@ ExpZero:
   sub eax, eax
   add ax, 1
   jmp OpPotEnd
+
+ExpOne:
+  jmp OpPotEnd
 OpPot:
   sub edx, edx
   sub esi, esi
   push integer_value
   push string_to_int_buffer_size
   push string_to_int_buffer
-  
+    
   call Read16Int ; return an integer as last param in stack
 
   pop eax
@@ -386,7 +414,7 @@ OpPot:
   pop cx ; integer_value returned from read function
   
   sub eax, eax
-  mov ax, cx
+  movsx eax, word cx
 
   push integer_value
   push string_to_int_buffer_size
@@ -400,6 +428,9 @@ OpPot:
 
   cmp dx, 0
   je ExpZero
+
+  cmp dx, 1
+  je ExpOne
   
   movzx esi, dx
 
