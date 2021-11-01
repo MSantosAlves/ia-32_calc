@@ -435,8 +435,9 @@ OpPotEnd:
   
   call Print16Int
 
-  cmp bx, 0
-  jne HandleOverflow
+  movsx ecx, word ax
+  cmp ecx, eax
+  jne HandleOverflow 
 
   jmp PrintMenu
 
