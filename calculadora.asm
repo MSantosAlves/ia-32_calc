@@ -1,5 +1,5 @@
 section .data 
-  menuMsg db "*-------------------*", 0dh, 0ah,
+  menu_msg db "*-------------------*", 0dh, 0ah,
           db "| Calculadora IA-32 |", 0dh, 0ah,
           db "*-------------------*", 0dh, 0ah,
           db "", 0dh, 0ah,
@@ -15,11 +15,22 @@ section .data
           db "8 - Multiplicação (strings)", 0dh, 0ah,
           db "9 - Sair", 0dh, 0ah
 
-  menuMsgLen EQU $-menuMsg 
+  menu_msg_len EQU $-menu_msg 
   negative_signal db '-'
 
   invalid_op_msg db "Operação inválida.", 0ah, 0dh
   invalid_op_msg_len EQU $-invalid_op_msg
+  resultado_msg db "Resultado: "
+  resultado_msg_len EQU $-resultado_msg
+
+  parte_inteira_msg db "Parte inteira: ", 0ah, 0dh
+  parte_inteira_msg_len EQU $-parte_inteira_msg
+
+  resto_msg db "Resto da divisão: ", 0ah, 0dh
+  resto_msg_len EQU $-resto_msg
+
+  overflow_msg db "DEU OVERFLOW.", 0ah, 0dh
+  overflow_msg_size EQU $-overflow_msg
 section .bss 
   string_to_int_buffer resb 7 ; buffer to save input as string
   string_to_int_buffer_size EQU $-string_to_int_buffer
@@ -35,27 +46,28 @@ section .text
 _start:
   call PrintMenu
 
+  call ExitProgram
+
+PrintMenu:
+  mov eax, 4      
+  mov ebx, 1      
+  mov ecx, menu_msg   
+  mov edx, menu_msg_len
+  int 80h
+
   push integer_value
   push string_to_int_buffer_size
   push string_to_int_buffer
   
   call Read16Int ; return an integer as last param in stack
 
+  sub ecx, ecx
   pop eax
   pop ebx
   pop cx ; integer_value
   mov word [integer_value], cx
 
   call ChooseOperation
-
-  call ExitProgram
-
-PrintMenu:
-  mov eax, 4      
-  mov ebx, 1      
-  mov ecx, menuMsg   
-  mov edx, menuMsgLen
-  int 80h
 
   ret
 
@@ -109,28 +121,295 @@ InvalidOperation:
   push ebx
   push eax
 
-  jmp _start
-  
-OpSum:
-  jmp _start
-OpSub:
-  jmp _start
-OpMult:
-  jmp _start
-OpDiv:
-  jmp _start
+  jmp PrintMenu
+        
 
+OpSum:
+  sub edx, edx
+  push integer_value
+  push string_to_int_buffer_size
+  push string_to_int_buffer
+  
+  call Read16Int ; return an integer as last param in stack
+
+  pop eax
+  pop ebx
+  pop cx ; integer_value returned from read function
+  
+  mov dx, cx
+
+  push integer_value
+  push string_to_int_buffer_size
+  push string_to_int_buffer
+  
+  call Read16Int ; return an integer as last param in stack
+
+  pop eax
+  pop ebx
+  pop cx ; integer_value returned from read function
+  
+  add dx, cx ; D = A + B
+
+  push eax
+  push ebx
+  push ecx
+  push edx
+
+  mov eax, 4
+  mov ebx, 1
+  mov ecx, resultado_msg
+  mov edx, resultado_msg_len
+  int 80h
+  
+  pop edx
+  pop ecx
+  pop ebx
+  pop eax
+
+  push int_to_string_buffer
+  push word dx
+  
+  call Print16Int
+  
+  jmp PrintMenu
+OpSub:
+  sub edx, edx
+  push integer_value
+  push string_to_int_buffer_size
+  push string_to_int_buffer
+  
+  call Read16Int ; return an integer as last param in stack
+
+  pop eax
+  pop ebx
+  pop cx ; integer_value returned from read function
+  
+  mov dx, cx
+
+  push integer_value
+  push string_to_int_buffer_size
+  push string_to_int_buffer
+  
+  call Read16Int ; return an integer as last param in stack
+
+  pop eax
+  pop ebx
+  pop cx ; integer_value returned from read function
+  
+  sub dx, cx ; D = A - B
+
+  push eax
+  push ebx
+  push ecx
+  push edx
+
+  mov eax, 4
+  mov ebx, 1
+  mov ecx, resultado_msg
+  mov edx, resultado_msg_len
+  int 80h
+  
+  pop edx
+  pop ecx
+  pop ebx
+  pop eax
+
+  push int_to_string_buffer
+  push word dx
+  
+  call Print16Int
+  
+  jmp PrintMenu
+OpMult:
+  sub edx, edx
+  push integer_value
+  push string_to_int_buffer_size
+  push string_to_int_buffer
+  
+  call Read16Int ; return an integer as last param in stack
+
+  pop eax
+  pop ebx
+  pop cx ; integer_value returned from read function
+  
+  sub eax, eax
+  mov ax, cx
+
+  push integer_value
+  push string_to_int_buffer_size
+  push string_to_int_buffer
+  
+  call Read16Int ; return an integer as last param in stack
+
+  pop ebx
+  pop ebx
+  pop dx ; integer_value returned from read function
+  
+  imul dx ; A = B * C 
+
+  mov ebx, eax
+  mov bx, 0   ; save overflow info (has overflow if first 16 digits binary > 0)
+
+  push eax
+  push ebx
+  push ecx
+  push edx
+
+  mov eax, 4
+  mov ebx, 1
+  mov ecx, resultado_msg
+  mov edx, resultado_msg_len
+  int 80h
+  
+  pop edx
+  pop ecx
+  pop ebx
+  pop eax
+
+  push int_to_string_buffer
+  push word ax
+  
+  call Print16Int
+
+  cmp ebx, 0
+  ja HandleOverflow
+  
+  jmp PrintMenu
+OpDiv:
+  sub ecx, ecx
+  sub eax, eax
+
+  push integer_value
+  push string_to_int_buffer_size
+  push string_to_int_buffer
+  
+  call Read16Int ; return an integer as last param in stack
+
+  pop edx
+  pop ebx
+  pop cx ; integer_value returned from read function
+  
+  mov ax, cx
+
+  sub ecx, ecx
+  push integer_value
+  push string_to_int_buffer_size
+  push string_to_int_buffer
+  
+  call Read16Int ; return an integer as last param in stack
+
+  pop edx
+  pop ebx
+  pop cx ; integer_value returned from read function
+
+  ;Debug:
+  idiv cx ; TODO : FIX SEGMENTATION FAULT
+
+  push eax
+  push ebx
+  push ecx
+  push edx
+
+  mov eax, 4
+  mov ebx, 1
+  mov ecx, parte_inteira_msg
+  mov edx, parte_inteira_msg_len
+  int 80h
+  
+  pop edx
+  pop ecx
+  pop ebx
+  pop eax
+
+  push int_to_string_buffer
+  push word ax
+  
+  call Print16Int
+  
+  jmp PrintMenu 
+
+ExpZero:
+  sub eax, eax
+  add ax, 1
+  jmp OpPotEnd
 OpPot:
-  jmp _start
+  sub edx, edx
+  sub esi, esi
+  push integer_value
+  push string_to_int_buffer_size
+  push string_to_int_buffer
+  
+  call Read16Int ; return an integer as last param in stack
+
+  pop eax
+  pop ebx
+  pop cx ; integer_value returned from read function
+  
+  sub eax, eax
+  mov ax, cx
+
+  push integer_value
+  push string_to_int_buffer_size
+  push string_to_int_buffer
+  
+  call Read16Int ; return an integer as last param in stack
+
+  pop ebx
+  pop ebx
+  pop dx ; integer_value returned from read function
+
+  cmp dx, 0
+  je ExpZero
+  
+  movzx esi, dx
+
+OpPotLoop:
+  imul cx 
+
+  sub esi, 1
+  cmp esi, 1
+  jg OpPotLoop
+
+OpPotEnd:
+  push eax
+  push ebx
+  push ecx
+  push edx
+
+  mov eax, 4
+  mov ebx, 1
+  mov ecx, resultado_msg
+  mov edx, resultado_msg_len
+  int 80h
+  
+  pop edx
+  pop ecx
+  pop ebx
+  pop eax
+
+  push int_to_string_buffer
+  push word ax
+  
+  call Print16Int
+
+  jmp PrintMenu
 
 OpFat:
-  jmp _start
-
+  jmp PrintMenu
 OpConcat:
-  jmp _start
+  jmp PrintMenu
 
 OpRepeat:
-  jmp _start
+  jmp PrintMenu
+
+HandleOverflow:
+  mov eax, 4
+  mov ebx, 1
+  mov ecx, overflow_msg
+  mov edx, overflow_msg_size
+  int 80h
+
+  jmp PrintMenu
 
 ; *-----------------------------------*
 ; |  Functions to read 16 bits input  | 
@@ -242,6 +521,10 @@ Print16Int:
   push eax
   push ebx
   push ecx
+
+  sub eax, eax
+  sub ebx, eax
+  sub ecx, eax
   
   mov ax, word [ebp+8]
 
@@ -272,12 +555,7 @@ Print16IntLoop:
 
   dec ecx
 
-
 Print16IntLoop2:  
-
-  push eax
-  mov al, [ecx]
-  pop eax
 
   mov eax, 4
   mov ebx, 1  
@@ -298,6 +576,7 @@ Print16IntEnd:
   pop eax
   pop ebp
 
+  ret 8
 ExitProgram:
   mov eax, 1 
   mov ebx, 0      
